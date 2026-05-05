@@ -19,12 +19,13 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 
-from utils import (
+from core.utils import (
     categorize_rain,
     fetch_precipitation_data,
     fetch_precipitation_forecast,
     pune_holidays_2024,
     pune_holidays_2025,
+    pune_holidays_2026,
 )
 
 
@@ -43,6 +44,27 @@ class ModelArtifacts:
     scaler: StandardScaler
     feature_columns: List[str]
     meta: Dict[str, object]
+
+
+@dataclass(frozen=True)
+class MultiModelArtifacts:
+    models: Dict[str, object]
+    scaler: StandardScaler
+    feature_columns: List[str]
+    metrics: Dict[str, Dict[str, float]]
+    best_model: str
+    meta: Dict[str, object]
+
+    def as_single(self, model_name: str) -> ModelArtifacts:
+        if model_name not in self.models:
+            raise ValueError(f"Model {model_name} not found. Available: {list(self.models)}")
+        return ModelArtifacts(
+            model_name=model_name,
+            model=self.models[model_name],
+            scaler=self.scaler,
+            feature_columns=self.feature_columns,
+            meta=self.meta,
+        )
 
 
 def get_repo_paths() -> Tuple[Path, Path, Path]:
@@ -69,22 +91,12 @@ def load_training_csv() -> pd.DataFrame:
     return df
 
 
-def _holiday_month_day_set() -> set[tuple[int, int]]:
-    """
-    Temporary holiday handling.
-
-    You will provide the real holiday list later. For now we approximate holidays for other
-    years by reusing the (month, day) patterns observed in the last 2 years holiday lists.
-    """
-    s = set()
-    for d in pd.to_datetime(pune_holidays_2024 + pune_holidays_2025):
-        s.add((int(d.month), int(d.day)))
-    return s
+def _all_holiday_dates() -> set:
+    return set(pd.to_datetime(pune_holidays_2024 + pune_holidays_2025 + pune_holidays_2026).date)
 
 
 def _is_holiday(dt: Date) -> int:
-    md = (int(dt.month), int(dt.day))
-    return int(md in _holiday_month_day_set())
+    return int(dt in _all_holiday_dates())
 
 
 def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -172,8 +184,8 @@ def evaluate_model(model: object, y_true: np.ndarray, y_pred: np.ndarray) -> Dic
 def candidate_models() -> Dict[str, object]:
     return {
         "Linear Regression": LinearRegression(),
-        "KNN (k=7)": KNeighborsRegressor(n_neighbors=7),
-        "Random Forest (n=200)": RandomForestRegressor(n_estimators=200, random_state=42),
+        "KNN (k=2)": KNeighborsRegressor(n_neighbors=2),
+        "Random Forest (n=47)": RandomForestRegressor(n_estimators=47, random_state=42),
     }
 
 
@@ -254,12 +266,58 @@ def load_artifacts(path: Optional[Path] = None) -> ModelArtifacts:
 
     _, _, artifacts_dir = get_repo_paths()
     p = path or (artifacts_dir / "footfall_model.joblib")
+
+    if not Path(p).exists():
+        multi_p = artifacts_dir / "footfall_models.joblib"
+        if multi_p.exists():
+            multi = load_all_artifacts(multi_p)
+            return multi.as_single(multi.best_model)
+    
     payload = joblib.load(p)
     return ModelArtifacts(
         model_name=str(payload["model_name"]),
         model=payload["model"],
         scaler=payload["scaler"],
         feature_columns=list(payload["feature_columns"]),
+        meta=dict(payload.get("meta", {})),
+    )
+
+
+def save_all_artifacts(multi: MultiModelArtifacts) -> Path:
+    if joblib is None:
+        raise RuntimeError("joblib is required to save model artifacts")
+
+    _, _, artifacts_dir = get_repo_paths()
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    out_path = artifacts_dir / "footfall_models.joblib"
+    joblib.dump(
+        {
+            "models": multi.models,
+            "scaler": multi.scaler,
+            "feature_columns": multi.feature_columns,
+            "metrics": multi.metrics,
+            "best_model": multi.best_model,
+            "meta": multi.meta,
+        },
+        out_path,
+    )
+    return out_path
+
+
+def load_all_artifacts(path: Optional[Path] = None) -> MultiModelArtifacts:
+    if joblib is None:
+        raise RuntimeError("joblib is required to load model artifacts")
+
+    _, _, artifacts_dir = get_repo_paths()
+    p = path or (artifacts_dir / "footfall_models.joblib")
+
+    payload = joblib.load(p)
+    return MultiModelArtifacts(
+        models=dict(payload["models"]),
+        scaler=payload["scaler"],
+        feature_columns=list(payload["feature_columns"]),
+        metrics={str(k): dict(v) for k, v in dict(payload.get("metrics", {})).items()},
+        best_model=str(payload.get("best_model", "")),
         meta=dict(payload.get("meta", {})),
     )
 

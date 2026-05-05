@@ -1,7 +1,10 @@
 import requests
+import urllib3
 import pandas as pd
 
-def fetch_precipitation_data(latitude=18.5898, longitude=73.7997, start_date='2024-01-01', end_date='2025-12-31'):
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def fetch_precipitation_data(latitude=18.5898, longitude=73.7997, start_date=None, end_date=None):
     """
     Fetch historical precipitation data from Open-Meteo API for a given location and date range.
     
@@ -27,10 +30,11 @@ def fetch_precipitation_data(latitude=18.5898, longitude=73.7997, start_date='20
     }
     
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, verify=False)
         response.raise_for_status()
         data = response.json()
         
+          
         # Extract precipitation data
         dates = data['daily']['time']
         precipitation = data['daily']['precipitation_sum']
@@ -77,7 +81,7 @@ def fetch_precipitation_forecast(latitude=18.5898, longitude=73.7997, start_date
     }
 
     try:
-        response = requests.get(url, params=params, timeout=30)
+        response = requests.get(url, params=params, timeout=30, verify=False)
         response.raise_for_status()
         data = response.json()
 
@@ -132,4 +136,19 @@ pune_holidays_2025 = [
     '2025-10-21', # Diwali - Laxmi Pujan
     '2025-10-22', # Diwali - Padwa
     '2025-12-25', # Christmas
+]
+
+pune_holidays_2026 = [
+    '2026-01-01', # New Year
+    '2026-01-26', # Republic Day
+    '2026-03-03', # Holi
+    '2026-03-19', # Gudi Padava
+    '2026-04-03', # Good Friday
+    '2026-05-01', # Maharashtra Day
+    '2026-05-28', # (holiday)
+    '2026-09-14', # Anant Chaturdashi
+    '2026-09-25', # (holiday)
+    '2026-10-02', # Gandhi Jayanti
+    '2026-10-20', # Diwali - Laxmi Pujan
+    '2026-12-25', # Christmas
 ]

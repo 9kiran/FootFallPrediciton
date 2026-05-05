@@ -55,23 +55,24 @@ def evaluate_and_plot_variations(model_class, param_grid, model_name, X_train, y
         st.write(f"{i+1}. {row['params']} -> R2={row['R2']:.4f}, RMSE={row['RMSE']:.2f}, MAE={row['MAE']:.2f}")
 
     # plot metric evolution
-    df_plot = results_df.copy()
-    df_plot['idx'] = df_plot.index + 1
+    df_plot = results_df.sort_values('param_index').reset_index(drop=True)  # ensure plots are in order of the hyperparameter
+    x_vals = df_plot['param_index']
+    x_label = next(iter(param_grid.keys()))
 
     fig, ax = plt.subplots(1, 3, figsize=(figsize[0], figsize[1]))
-    ax[0].plot(df_plot['idx'], df_plot['R2'], marker='o')
+    ax[0].plot(x_vals, df_plot['R2'], marker='o')
     ax[0].set_title(f'{model_name} R² Trend')
-    ax[0].set_xlabel(model_name)
+    ax[0].set_xlabel(x_label)
     ax[0].set_ylabel('R²')
 
-    ax[1].plot(df_plot['idx'], df_plot['RMSE'], marker='o', color='orange')
+    ax[1].plot(x_vals, df_plot['RMSE'], marker='o', color='orange')
     ax[1].set_title(f'{model_name} RMSE Trend')
-    ax[1].set_xlabel(model_name)
+    ax[1].set_xlabel(x_label)
     ax[1].set_ylabel('RMSE')
 
-    ax[2].plot(df_plot['idx'], df_plot['MAE'], marker='o', color='green')
+    ax[2].plot(x_vals, df_plot['MAE'], marker='o', color='green')
     ax[2].set_title(f'{model_name} MAE Trend')
-    ax[2].set_xlabel(model_name)
+    ax[2].set_xlabel(x_label)
     ax[2].set_ylabel('MAE')
 
     st.pyplot(fig)

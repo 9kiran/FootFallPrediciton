@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
+from sklearn.preprocessing import StandardScaler
 
-from pipeline import (
-    add_calendar_features,
-    add_lag_features,
-    add_rain_features_historic,
+from core.dataEnrichment import dataEnrichment
+from core.dataFilter import dataFilter
+from core.dataSplitAndScale import dataSplitAndScale
+from core.pipeline import (
+    MultiModelArtifacts,
+    candidate_models,
+    evaluate_model,
     load_training_csv,
-    make_feature_matrix,
-    save_artifacts,
-    select_best,
-    train_and_score_models,
-    train_best_on_all_data,
+    save_all_artifacts,
+    select_best
 )
 
 
@@ -36,47 +38,67 @@ This app uses the last 2 years of historical data to:
         st.dataframe(df.head(10), use_container_width=True)
 
     with st.expander("Feature engineering (calendar + rain + lag/rolling)", expanded=True):
-        df = add_calendar_features(df)
-        df = add_rain_features_historic(df)
-        df = add_lag_features(df)
-        st.write("Engineered columns preview")
-        st.dataframe(
-            df[["date", "breakfast_footfall_pct", "day", "month", "is_weekend", "is_holiday", "is_long_weekend", "rain_category", "rolling_7", "lag_7"]].head(12),
-            use_container_width=True,
-        )
+        df = dataEnrichment(df)
 
     with st.expander("Build model matrix (weekdays only + one-hot)", expanded=True):
-        bundle = make_feature_matrix(df)
-        st.write(f"Training rows (weekdays): {len(bundle.X)}")
-        st.write(f"Number of features: {bundle.X.shape[1]}")
-        st.write("Feature columns")
-        st.code(", ".join(bundle.feature_columns))
+        X, Y = dataFilter(df)
+    
+    with st.expander("Train/test split + scaling (80/20  chronological)", expanded=True):
+        X_train_scaled, X_test_scaled, y_train, y_test = dataSplitAndScale(X, Y)
 
     st.subheader("Model efficiency (chronological split)")
-    train_frac = st.slider("Train split fraction", min_value=0.6, max_value=0.9, value=0.8, step=0.05)
-    results = train_and_score_models(bundle, train_frac=train_frac)
-    st.dataframe(results.sort_values(["R2", "RMSE", "MAE"], ascending=[False, True, True]), use_container_width=True, hide_index=True)
+    rows = []
+    for name, model in candidate_models().items():
+        model.fit(X_train_scaled, y_train)
+        pred = model.predict(X_test_scaled)
+        m = evaluate_model(model, y_test.to_numpy(), pred)
+        rows.append({"model": name, **m})
 
+    results = pd.DataFrame(rows)
+    st.dataframe(
+        results.sort_values(["R2", "RMSE", "MAE"], ascending=[False, True, True]), 
+        width = 'stretch',
+        hide_index=True
+    )
+    
     best_name = select_best(results)
     st.success(f"Selected best model: {best_name}")
 
-    st.subheader("Finalize + save artifacts (trained on ALL data)")
+    st.subheader("Finalize + save artifacts (all models trained on ALL data)")
     st.info(
-        "For long sequential forecasts, Linear Regression can go negative and get clamped to 0. "
-        "If that happens in the user app, select Random Forest or KNN here before saving."
-    )
-    final_model_name = st.selectbox(
-        "Model to save (trained on ALL data)",
-        options=list(results["model"]),
-        index=list(results["model"]).index(best_name),
+        "All candidate models will be retrained on the full dataset and saved together."
+        "The user app can then switch between them at prediction time."
     )
 
-    if st.button("Train selected model on ALL data and save"):
-        art = train_best_on_all_data(bundle, final_model_name)
-        out_path = save_artifacts(art)
-        st.success("Saved model artifacts.")
-        st.write(f"Artifact path: {out_path}")
-        st.json(art.meta)
+    if st.button("Train all candidate models on ALL data and save artifacts"):
+        scaler = StandardScaler()
+        X_all_scaled = scaler.fit_transform(X)
+
+        trained_models = {}
+        for name, model in candidate_models().items():
+            model.fit(X_all_scaled, Y)
+            trained_models[name] = model
+        
+        metrics = {row["model"]: {k: float(row[k]) for k in ("MAE", "RMSE", "R2")} 
+                   for _, row in results.iterrows()}
+        
+        art = MultiModelArtifacts(
+            models=trained_models,
+            scaler=scaler,
+            feature_columns=list(X.columns),
+            metrics=metrics,
+            best_model=best_name,
+            meta={
+                "trained_on": "all_weekday_rows",
+                "n_rows": int(len(X)),
+                "date_min": str(df['date'].min().date()),
+                "date_max": str(df['date'].max().date())
+            }
+        )
+        out_path = save_all_artifacts(art)
+        st.success(f"Saved {len(trained_models)} models.")
+        st.write(f"Artifacts saved to: `{out_path}`")
+        st.json({"best model": best_name, "models": list(trained_models), **art.meta})
 
 
 if __name__ == "__main__":

@@ -9,17 +9,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 
-from dataEnrichment import dataEnrichment
-from dataFilter import dataFilter
-from dataSplitAndScale import dataSplitAndScale
-from ModelOptimization import evaluate_and_plot_variations
+from core.dataEnrichment import dataEnrichment
+from core.dataFilter import dataFilter
+from core.dataSplitAndScale import dataSplitAndScale
+from core.ModelOptimization import evaluate_and_plot_variations
 
 st.set_page_config(layout="wide")
 
 # Set random seed for reproducibility
 np.random.seed(42)
 
-st.title("Breakfast Footfall Prediction Dashboard", text_alignment="center")
+st.title("Breakfast Footfall Prediction Dashboard")
 st.header("Data Prepartion for Modeling", divider=True)
 
 with st.expander("Loading and enriching data..."):
@@ -121,7 +121,7 @@ with tabs[2]:
     res = evaluate_and_plot_variations(
         RandomForestRegressor,
         {
-            'n_estimators': range(1, 25)
+            'n_estimators': range(1, 101)
         },
         'RandomForest',
         X_train_scaled,
