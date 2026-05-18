@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression
 
-from core.dataEnrichment import dataEnrichment
+from core.dataEnrichment import data_enrichment
 from core.dataFilter import dataFilter
 from core.dataSplitAndScale import dataSplitAndScale
 from core.ModelOptimization import evaluate_and_plot_variations
@@ -26,7 +26,7 @@ with st.expander("Loading and enriching data..."):
     df = pd.read_csv('..\canteen_breakfast_data.csv')
     st.write(f"Initial data loaded with {len(df)} records and columns: {list(df.columns)}")
     st.write(df.head())
-    df = dataEnrichment(df)
+    df = data_enrichment(df)
 
 with st.expander("Preparing data for modeling..."):
     X,Y = dataFilter(df)

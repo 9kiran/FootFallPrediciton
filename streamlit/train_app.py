@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from sklearn.preprocessing import StandardScaler
 
-from core.dataEnrichment import dataEnrichment
+from core.dataEnrichment import data_enrichment
 from core.dataFilter import dataFilter
 from core.dataSplitAndScale import dataSplitAndScale
 from core.pipeline import (
@@ -23,7 +23,7 @@ def main() -> None:
 
     st.markdown(
         """
-This app uses the last 2 years of historical data to:
+This app uses the historical data to:
 - Prepare/enrich data (calendar, rain, lag/rolling)
 - Split chronologically to evaluate model efficiency
 - Finalize one model based on metrics
@@ -38,7 +38,7 @@ This app uses the last 2 years of historical data to:
         st.dataframe(df.head(10), use_container_width=True)
 
     with st.expander("Feature engineering (calendar + rain + lag/rolling)", expanded=True):
-        df = dataEnrichment(df)
+        df = data_enrichment(df)
 
     with st.expander("Build model matrix (weekdays only + one-hot)", expanded=True):
         X, Y = dataFilter(df)

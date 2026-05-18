@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core.dataEnrichment import dataEnrichment
+from core.dataEnrichment import data_enrichment
 from core.dataFilter import dataFilter
 from core.pipeline import (
     get_precip_for_dates,
@@ -67,7 +67,7 @@ def _forecast_sequence(
             )
             continue
         
-        enriched = dataEnrichment(running.copy(), verbose=False)
+        enriched = data_enrichment(running.copy(), verbose=False)
 
         target_mask = enriched["date"] == ts
         enriched.loc[target_mask, "precipitation_mm"] = precipitation

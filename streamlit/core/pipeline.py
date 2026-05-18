@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date as Date
+from datetime import date as Date, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+_ARCHIVE_LAG_DAYS = 5
 import numpy as np
 import pandas as pd
 
@@ -289,7 +290,8 @@ def save_all_artifacts(multi: MultiModelArtifacts) -> Path:
 
     _, _, artifacts_dir = get_repo_paths()
     artifacts_dir.mkdir(parents=True, exist_ok=True)
-    out_path = artifacts_dir / "footfall_models.joblib"
+    # out_path = artifacts_dir / "footfall_models.joblib"
+    out_path = artifacts_dir / "v2-footfall_models.joblib"
     joblib.dump(
         {
             "models": multi.models,
@@ -435,8 +437,9 @@ def get_precip_for_dates(dates: List[Date], today: Optional[Date] = None) -> Dic
         return {}
 
     ref = today or pd.Timestamp.today().date()
-    past = [d for d in dates if d < ref]
-    future = [d for d in dates if d >= ref]
+    archive_cutoff = ref - pd.Timedelta(days=_ARCHIVE_LAG_DAYS)
+    past = [d for d in dates if d < archive_cutoff]
+    future = [d for d in dates if d >= archive_cutoff]
 
     out: Dict[Date, float] = {}
     out.update(_get_archive_precip_for_dates(past))

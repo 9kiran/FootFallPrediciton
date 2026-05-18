@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 
 from core.utils import fetch_precipitation_data, categorize_rain, pune_holidays_2024, pune_holidays_2025, pune_holidays_2026
-from core.pipeline import get_precip_for_dates
 
 def _noop(*args, **kwargs):
     return None
@@ -18,24 +17,21 @@ def data_enrichment(df, verbose: bool = True):
     else:
         raise KeyError("Dataframe must contain a 'date' column for enrichment")
     
-    all_dates = df['date'].dt.date.tolist()
     data_start = df['date'].min().date().isoformat()
     data_end = df['date'].max().date().isoformat()
     write(f"Fetching Precipitation data from Open-Meteo API ({data_start} \u2192 {data_end})...")
-    # df_rain = fetch_precipitation_data(start_date=data_start, end_date=data_end)
+    df_rain = fetch_precipitation_data(start_date=data_start, end_date=data_end)
 
-    # if df_rain is not None:
-    #     # merge into main df by matching date (both lowercase)
-    #     df = df.merge(df_rain.rename(columns={'date': 'date'}), on='date', how='left')
-    #     write(f"Merged precipitation data, resulting dataframe has {len(df)} records")
-    #     write(df[['date','precipitation_mm']].head(10))
-    # else:
-    #     # create placeholder column so later code doesn't break
-    #     df['precipitation_mm'] = np.nan
-    #     write("No precipitation data available; column filled with NaN.")
-    precip_map = get_precip_for_dates(all_dates)
-    df['precipitation_mm'] = df['date'].dt.date.map(precip_map)
-    write(f"Precipitation data mapped to main dataframe, resulting dataframe has {len(df)} records")
+    if df_rain is not None:
+        # merge into main df by matching date (both lowercase)
+        df = df.merge(df_rain.rename(columns={'date': 'date'}), on='date', how='left')
+        write(f"Merged precipitation data, resulting dataframe has {len(df)} records")
+        write(df[['date','precipitation_mm']].head(10))
+    else:
+        # create placeholder column so later code doesn't break
+        df['precipitation_mm'] = np.nan
+        write("No precipitation data available; column filled with NaN.")
+
 
     # Apply rain categorization and prepare for feature engineering
     df['rain_category'] = df['precipitation_mm'].apply(categorize_rain)
